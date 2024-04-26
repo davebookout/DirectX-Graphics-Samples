@@ -30,6 +30,10 @@
     <ClInclude Include="Win32Application.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SpriteRendering.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -47,13 +51,22 @@
     <ClCompile Include="Win32Application.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SpriteRendering.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="shaders.hlsl">
       <Filter>Assets\Shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="tests\spriteshaders.hlsl">
+      <Filter>Assets\Shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="D3D12HelloTexture.rc" />
   </ItemGroup>
 </Project>
