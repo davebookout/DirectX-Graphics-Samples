@@ -22,6 +22,9 @@ using namespace DirectX;
 // An example of this can be found in the class method: OnDestroy().
 using Microsoft::WRL::ComPtr;
 
+#include "SpriteRendering.h"
+
+
 class D3D12HelloTexture : public DXSample
 {
 public:
@@ -31,6 +34,9 @@ public:
     virtual void OnUpdate();
     virtual void OnRender();
     virtual void OnDestroy();
+
+    void SetTestData(SpriteTest* test);
+    SpriteRenderer spriteRenderer;
 
 private:
     static const UINT FrameCount = 2;
@@ -75,4 +81,10 @@ private:
     std::vector<UINT8> GenerateTextureData();
     void PopulateCommandList();
     void WaitForPreviousFrame();
+
+    SpriteTest* m_test;
+    ComPtr<ID3D12Resource> m_spriteBuffer;
+    D3D12_VERTEX_BUFFER_VIEW m_spriteBufferView;
+    std::vector<ComPtr<ID3D12Resource>> m_spriteTextures;
+
 };

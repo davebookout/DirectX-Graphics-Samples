@@ -11,9 +11,10 @@
 
 #include "stdafx.h"
 #include "D3D12HelloTexture.h"
+#include "SpriteRendering.h"
 
 D3D12HelloTexture::D3D12HelloTexture(UINT width, UINT height, std::wstring name) :
-    DXSample(width, height, name),
+    DXSample(width, height, name), 
     m_frameIndex(0),
     m_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)),
     m_scissorRect(0, 0, static_cast<LONG>(width), static_cast<LONG>(height)),
@@ -25,6 +26,9 @@ void D3D12HelloTexture::OnInit()
 {
     LoadPipeline();
     LoadAssets();
+    std::wstring assetPath = GetAssetFullPath(L"");
+    spriteRenderer.CreatePipelineState(m_device.Get(), m_commandList.Get(), m_commandQueue.Get(), assetPath);
+    spriteRenderer.LoadAssets(m_device.Get(), m_commandList.Get(), m_commandQueue.Get(), assetPath);
 }
 
 // Load the rendering pipeline dependencies.
@@ -40,8 +44,11 @@ void D3D12HelloTexture::LoadPipeline()
         if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController))))
         {
             debugController->EnableDebugLayer();
-
             // Enable additional debug layers.
+            ComPtr<ID3D12Debug1> spDebugController1;
+            if (SUCCEEDED(debugController->QueryInterface(IID_PPV_ARGS(&spDebugController1)))) {
+                spDebugController1->SetEnableGPUBasedValidation(true);
+            }
             dxgiFactoryFlags |= DXGI_CREATE_FACTORY_DEBUG;
         }
     }
@@ -234,9 +241,9 @@ void D3D12HelloTexture::LoadAssets()
         // Define the geometry for a triangle.
         Vertex triangleVertices[] =
         {
-            { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 0.5f, 0.0f } },
-            { { 0.25f, -0.25f * m_aspectRatio, 0.0f }, { 1.0f, 1.0f } },
-            { { -0.25f, -0.25f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f } }
+            { { 0.0f, 0.0f * m_aspectRatio, 0.0f }, { 0.5f, 0.0f } },
+            { { 0.0f, 0.25f * m_aspectRatio, 0.0f }, { 1.0f, 1.0f } },
+            { { .25f, 0.0f * m_aspectRatio, 0.0f }, { 0.0f, 1.0f } }
         };
 
         const UINT vertexBufferSize = sizeof(triangleVertices);
@@ -452,6 +459,10 @@ void D3D12HelloTexture::PopulateCommandList()
     m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
     m_commandList->DrawInstanced(3, 1, 0, 0);
 
+    spriteRenderer.PopulateCommandList(m_commandList.Get());
+
+    //m_commandList->IASetVertexBuffers(0, 1, &m_spriteBufferView);
+    //m_commandList->DrawInstanced(3, m_test->sprites.size(), 0, 0);
     // Indicate that the back buffer will now be used to present.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
@@ -478,4 +489,10 @@ void D3D12HelloTexture::WaitForPreviousFrame()
     }
 
     m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
+}
+
+
+void D3D12HelloTexture::SetTestData(SpriteTest* test) {
+    m_test = test;
+
 }
