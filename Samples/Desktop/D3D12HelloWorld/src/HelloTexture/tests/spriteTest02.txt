@@ -1,0 +1,17 @@
+Textures 9
+images/cat.png
+images/cat_2.png
+images/catompunk00.png
+images/catompunk01.png
+images/catompunk02.png
+images/catompunk03.png
+images/catompunk04.png
+images/dog.png
+images/oddSize.png
+
+Sprites 5
+0.0 0.0 .50 .50 0.0 0
+.50 .50 .50 .50 -45.0 0
+-.50 -.50 .50 .5 0.0 1
+0.0 -.50 .50 .50 45.0 1
+-.5 0.0 .5 .5 0.0 2

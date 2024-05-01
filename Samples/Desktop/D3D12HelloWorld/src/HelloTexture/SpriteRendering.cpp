@@ -6,6 +6,7 @@
 #include "stb_image.h"
 #define _CRT_SECURE_NO_WARNINGS
 #include "d3dx12.h"
+#include <array>
 
 using namespace std;
 
@@ -14,23 +15,14 @@ const int arrayOffset = 1;
 const int atlasOffset = 2;
 const int singleTextureOffset = 3;
 
-const char testFileName[] = "spriteTest01.txt";
+//const char testFileName[] = "spriteTest01.txt";
+const char testFileName[] = "spriteTest02.txt";
 
-struct TextureLoad {
-	int offset[2];
-	float u[2];
-	float v[2];
-};
-struct TextureResource {
-	ID3D12Resource* pResource;
-	ID3D12Resource* pTextureSampleParams;
-	vector<TextureLoad> load;
-
-};
 
 // CreateSingleTextures
 // returns a vector of resources created from the input textures
-vector<ID3D12Resource*> CreateSingleTextures(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset);
+// dead! only arrays!
+//vector<ID3D12Resource*> CreateSingleTextures(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset);
 
 // CreateTextureArray
 // returns a TextureArray resource from the input textures.
@@ -42,18 +34,21 @@ vector<ID3D12Resource*> CreateSingleTextures(vector<Texture>& textures, ID3D12De
 TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset);
 
 // CreateTextureAtals
-// 
-TextureResource CreateTextureAtlas(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset);
+TextureAtlas CreateTextureAtlas(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset, int baseTextureSize = 2048);
+//TextureAtlas CreateTextureAtlas(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset);
 ID3D12Resource* CreateStaticBuffer(BYTE* pData, int sizeInBytes, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset);
 
 void CopyIntoImage(BYTE* dst, int dstPitch, int dstOffsetX, int dstOffsetY, BYTE* src, int srcPitch, int rows);
 
 void LoadTest(SpriteTest& test);
+bool LoadFont(vector<Texture>& textures);
+
 void PrintTestParams(SpriteTest& test);
 
 
 void SpriteRenderer::LoadAssets(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, std::wstring assetPath)
 {
+	LoadFont(mData.textures);
 	LoadTest(mData);
 	pCommandList->Reset(mCommandAllocator, mPipelineState);
 	{
@@ -65,7 +60,8 @@ void SpriteRenderer::LoadAssets(ID3D12Device* pDevice, ID3D12GraphicsCommandList
 			{ "TEXTURE_ID", 0, DXGI_FORMAT_R32_SINT, 0, 20, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 0 },
 		};
 
-		const UINT vertexBufferSize = sizeof(Sprite) * mData.sprites.size();
+		const int MAX_SPRITES = 2048;
+		const UINT vertexBufferSize = sizeof(Sprite) * MAX_SPRITES;// mData.sprites.size();
 
 
 		// Note: using upload heaps to transfer static data like vert buffers is not 
@@ -81,11 +77,11 @@ void SpriteRenderer::LoadAssets(ID3D12Device* pDevice, ID3D12GraphicsCommandList
 			IID_PPV_ARGS(&mSpriteBuffer));
 
 		// Copy the triangle data to the vertex buffer.
-		UINT8* pVertexDataBegin;
+		//UINT8* mpVertexDataBegin;
 		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-		mSpriteBuffer->Map(0, &readRange, reinterpret_cast<void**>(&pVertexDataBegin));
-		memcpy(pVertexDataBegin, mData.sprites.data(), vertexBufferSize);
-		mSpriteBuffer->Unmap(0, nullptr);
+		mSpriteBuffer->Map(0, &readRange, reinterpret_cast<void**>(&mpVertexDataBegin));
+		memcpy(mpVertexDataBegin, mData.sprites.data(), sizeof(Sprite) * mData.sprites.size());
+		//mSpriteBuffer->Unmap(0, nullptr);
 
 		// Initialize the vertex buffer view.
 		mSpriteBufferView.BufferLocation = mSpriteBuffer->GetGPUVirtualAddress();
@@ -93,19 +89,22 @@ void SpriteRenderer::LoadAssets(ID3D12Device* pDevice, ID3D12GraphicsCommandList
 		mSpriteBufferView.SizeInBytes = vertexBufferSize;
 	}
 
-	// Note: ComPtr's are CPU objects but this resource needs to stay in scope until
-	// the command list that references it has finished executing on the GPU.
-	// We will flush the GPU at the end of this method to ensure the resource is not
-	// prematurely destroyed.
-	ID3D12Resource* pTextureUploadHeap;
+	vector<TextureAtlas> singleTextures;
+	int texOffset = 0;
+	for (Texture& t : mData.textures) {
+		vector<Texture> vt; vt.push_back(t);
+		singleTextures.push_back(CreateTextureArray(vt, pDevice, pCommandList, mSRVHeap, singleTextureOffset + texOffset++));
+	}
 
-	//Create single textures
-	vector<ID3D12Resource*> pSingleTextures = CreateSingleTextures(mData.textures, pDevice, pCommandList, mSRVHeap, singleTextureOffset);
+	SampleParameters* params = new SampleParameters[mData.textures.size() * 3];
+	for (int i = 0; i < mData.textures.size(); i++) {
+			
+	}
 	TextureAtlas array = CreateTextureArray(mData.textures, pDevice, pCommandList, mSRVHeap, arrayOffset);
-	ID3D12Resource* textureInfoBuffer = CreateStaticBuffer((BYTE*)(array.sampleParameters.data()), sizeof(SampleParameters) * mData.textures.size(), pDevice, pCommandList, mSRVHeap, cbufferOffset);
-	ID3D12Resource* pTextureArray = array.pResource;
-	
+	//ID3D12Resource* textureInfoBuffer = CreateStaticBuffer((BYTE*)(array.sampleParameters.data()), sizeof(SampleParameters) * mData.textures.size(), pDevice, pCommandList, mSRVHeap, cbufferOffset);
 
+	TextureAtlas atlas = CreateTextureAtlas(mData.textures, pDevice, pCommandList, mSRVHeap, atlasOffset);
+	ID3D12Resource* textureInfoBuffer = CreateStaticBuffer((BYTE*)(atlas.sampleParameters.data()), sizeof(SampleParameters) * mData.textures.size(), pDevice, pCommandList, mSRVHeap, cbufferOffset);
 	pCommandList->Close();
 	ID3D12CommandList* ppCommandLists[] = { pCommandList };
 	pCommandQueue->ExecuteCommandLists(1, ppCommandLists);
@@ -130,13 +129,7 @@ void SpriteRenderer::CreatePipelineState(ID3D12Device* pDevice, ID3D12GraphicsCo
 		CD3DX12_ROOT_PARAMETER1 rootParameters[2];
 		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
 		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_VERTEX);
-
-		//CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
-		//ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-		////ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_CBV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
-		//CD3DX12_ROOT_PARAMETER1 rootParameters[1];
-		//rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
-
+				
 		D3D12_STATIC_SAMPLER_DESC sampler = {};
 		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
 		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
@@ -228,20 +221,48 @@ void SpriteRenderer::PopulateCommandList(ID3D12GraphicsCommandList* pCommandList
 		//ID3D12DescriptorHeap* ppHeaps[] = { mSRVArrayHeap, mCBVHeap };
 		pCommandList->SetDescriptorHeaps(_countof(ppHeaps), ppHeaps);
 
-		CD3DX12_GPU_DESCRIPTOR_HANDLE textures(mSRVHeap->GetGPUDescriptorHandleForHeapStart(), mHeapIncr * arrayOffset);
-		CD3DX12_GPU_DESCRIPTOR_HANDLE constants(mSRVHeap->GetGPUDescriptorHandleForHeapStart(), mHeapIncr * cbufferOffset);
+		enum RenderPath {
+			single,
+			array,
+			atlas
+		};
+		RenderPath renderPath = single;
+		if (renderPath == single) {
+			CD3DX12_GPU_DESCRIPTOR_HANDLE constants(mSRVHeap->GetGPUDescriptorHandleForHeapStart(), mHeapIncr * cbufferOffset);
+			pCommandList->SetPipelineState(mPipelineState);
+			pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			pCommandList->IASetVertexBuffers(0, 1, &mSpriteBufferView);
 
-		pCommandList->SetGraphicsRootDescriptorTable(0, textures);
-		pCommandList->SetGraphicsRootDescriptorTable(1, constants);
-		pCommandList->SetPipelineState(mPipelineState);
-		pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			for (int i = 0; i < mData.offsets.size(); i++) {
+				int offset = mData.offsets[i];
+				int end = i + 1 < mData.offsets.size() ? mData.offsets[i + 1] : mData.sprites.size();
+				int numSprites = end - offset;
+				int textureID = mData.sprites[offset].textureID;
+				CD3DX12_GPU_DESCRIPTOR_HANDLE textures(mSRVHeap->GetGPUDescriptorHandleForHeapStart(), mHeapIncr* (singleTextureOffset + textureID));
+				pCommandList->SetGraphicsRootDescriptorTable(0, textures);
+				pCommandList->SetGraphicsRootDescriptorTable(1, constants);
+				pCommandList->DrawInstanced(3, numSprites, 0, offset);
+			}
+		}
+		else {
+			int textureOffset = renderPath == array ? arrayOffset : atlasOffset;
+			CD3DX12_GPU_DESCRIPTOR_HANDLE textures(mSRVHeap->GetGPUDescriptorHandleForHeapStart(), mHeapIncr* textureOffset);
+			CD3DX12_GPU_DESCRIPTOR_HANDLE constants(mSRVHeap->GetGPUDescriptorHandleForHeapStart(), mHeapIncr* cbufferOffset);
 
-		pCommandList->IASetVertexBuffers(0, 1, &mSpriteBufferView);
-		pCommandList->DrawInstanced(3, mData.sprites.size(), 0, 0);
+			pCommandList->SetPipelineState(mPipelineState);
+			pCommandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			pCommandList->IASetVertexBuffers(0, 1, &mSpriteBufferView);
+
+			pCommandList->SetGraphicsRootDescriptorTable(0, textures);
+			pCommandList->SetGraphicsRootDescriptorTable(1, constants);
+			pCommandList->DrawInstanced(3, mData.sprites.size(), 0, 0);
+
+		}
 	}
 }
 
 
+#if 0
 vector<ID3D12Resource*> CreateSingleTextures(vector<Texture>& textures, ID3D12Device* pDevice,  ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset) {
 
 	vector<ID3D12Resource*> result;
@@ -309,10 +330,11 @@ vector<ID3D12Resource*> CreateSingleTextures(vector<Texture>& textures, ID3D12De
 	return result;
 
 }
+#endif
 
 TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset) {
-		// array slices are same size -- find max size for slices
-		// will need scale for uvs if not same size.
+	// array slices are same size -- find max size for slices
+	// will need scale for uvs if not same size.
 	TextureAtlas result;
 	ID3D12Resource* pTexture = nullptr;
 	int maxWidth = INT_MIN;
@@ -322,17 +344,15 @@ TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice
 		maxHeight = max(maxHeight, t.size[1]);
 	}
 
-	ID3D12Resource* texture;
-	//for (Texture& t : textures)
 	{
 		ID3D12Resource* pTextureUploadHeap;
-
+		vector<BYTE*> tempCopiesForResize;
 		// Describe and create a Texture2D.
 		D3D12_RESOURCE_DESC textureDesc = {};
 		textureDesc.MipLevels = 1;
 		textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-		textureDesc.Width = maxWidth;// TextureWidth;
-		textureDesc.Height = maxHeight;// TextureHeight;
+		textureDesc.Width = maxWidth;
+		textureDesc.Height = maxHeight;
 		textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
 		textureDesc.DepthOrArraySize = textures.size();
 		textureDesc.SampleDesc.Count = 1;
@@ -358,16 +378,8 @@ TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice
 			IID_PPV_ARGS(&pTextureUploadHeap));
 
 		if (pTexture != nullptr && pTextureUploadHeap != nullptr) {
-			// Copy data to the intermediate upload heap and then schedule a copy 
-			// from the upload heap to the Texture2D.
-			//std::vector<UINT8> texture = GenerateTextureData();
-
-			
 			int rowPitch = maxWidth * 4;// t.channels;
 			int slicePitch = rowPitch * maxHeight;
-			
-			//BYTE* pCombinedData = (BYTE*)malloc(textureData.SlicePitch * textures.size());
-			//textureData.pData = pCombinedData;
 			vector<D3D12_SUBRESOURCE_DATA> subresourceData(textures.size());
 			for (int i = 0; i < textures.size(); i++) {
 				SampleParameters params;
@@ -382,12 +394,10 @@ TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice
 				subresourceData[i].SlicePitch = slicePitch;
 
 				if (textures[i].size[0] != maxWidth || textures[i].size[1] != maxHeight) {
-					//resize texture
 					BYTE* newData = (BYTE*) malloc(maxWidth * maxHeight * 4);
 					CopyIntoImage(newData, maxWidth * 4, 0, 0, textures[i].pData, textures[i].size[0] * 4, textures[i].size[1]);
-					free(textures[i].pData);
-					textures[i].pData = newData;
-					subresourceData[i].pData = textures[i].pData;
+					subresourceData[i].pData = newData;
+					tempCopiesForResize.push_back(newData);
 				}
 			}
 			UpdateSubresources(pCommandList, pTexture, pTextureUploadHeap, 0, 0, textures.size(), subresourceData.data());
@@ -406,13 +416,16 @@ TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice
 			srvDesc.Texture2DArray.PlaneSlice = 0;
 			srvDesc.Texture2DArray.ResourceMinLODClamp = 0;
 			int incrSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-			CD3DX12_CPU_DESCRIPTOR_HANDLE handle(pHeap->GetCPUDescriptorHandleForHeapStart(),incrSize * heapOffset);
-			pDevice->CreateShaderResourceView(pTexture, &srvDesc, handle);
+			result.pDescriptor.ptr = pHeap->GetCPUDescriptorHandleForHeapStart().ptr + incrSize * heapOffset;
+			pDevice->CreateShaderResourceView(pTexture, &srvDesc, result.pDescriptor);
 		}
+		for (BYTE* p : tempCopiesForResize) {
+			free(p);
+		}
+		tempCopiesForResize.clear();
 	}
 	result.pResource = pTexture;
 	return result;
-
 }
 
 void CopyIntoImage(BYTE* dst, int dstPitch, int dstOffsetX, int dstOffsetY, BYTE* src, int srcPitch, int rows) {
@@ -424,18 +437,124 @@ void CopyIntoImage(BYTE* dst, int dstPitch, int dstOffsetX, int dstOffsetY, BYTE
 	}
 }
 
-TextureResource CreateTextureAtlas(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset) {
-		return {};
+class Allocator2D {
+	int mBlockSize;
+	std::array<unsigned int, 32> mMemory;
+	//keep it simple with 32x32 block allocation	
+public:
+	Allocator2D() : mBlockSize(32), mMemory(array<unsigned int, 32>()) {
+		for (unsigned int& m : mMemory) {
+			m = 0xFFFFFFFF;
+		}
+	};
+	bool Available(int x, int y, int offset[2]) {
+		if (x + offset[0] >= mBlockSize || y + offset[1] >= mBlockSize)
+			return false;
+		unsigned int mask = (1 << x) - 1;
+		mask = mask << offset[0];
+		for (int j = offset[1]; j < offset[1] + y; j++) {
+			if ((mMemory[j] & mask) != mask) { 
+				return false;
+			}
+		}
+		return true;
+	}
+
+	void MarkUsed(int x, int y, int offset[2]) {
+		unsigned int m = ~( ((1 << x) - 1) << offset[0]);
+		for (int j = offset[1]; j < offset[1]+y; j++) {
+			mMemory[j] = (mMemory[j] & m);
+		}
+	}
+
+	bool Allocate(int blocksX, int blocksY, int outOffset[2]) {
+		//just grab first top left available...
+		unsigned int allocate = (1 << blocksX) - 1;
+		outOffset[0] = 0; outOffset[1] = 0;
+		while (outOffset[1] < mBlockSize) {
+			if (Available(blocksX, blocksY, outOffset))
+			{
+				MarkUsed(blocksX, blocksY, outOffset);
+				return true;
+			}
+			outOffset[1]++;
+			if (outOffset[1] == mBlockSize) {
+				if (outOffset[0] < mBlockSize - 1) {
+					outOffset[0]++;
+					outOffset[1] = 0;
+				}
+			}
+		}
+		return false;
+
+	}
+
+
+};
+
+TextureAtlas CreateTextureAtlas(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset, int baseTextureSize) {
+	
+	Allocator2D allocator;
+	//allocator has 32x32 blocks to allocate
+	//block size in texels will be
+	TextureAtlas result;
+	result.height = baseTextureSize;
+	result.width = baseTextureSize;
+	result.slices = 1;
+	int blockSizeTexels = baseTextureSize / 32;
+	vector<SampleParameters> sampleParameters;
+	BYTE* pData = (BYTE*)malloc(baseTextureSize * baseTextureSize * 4);
+	vector<int> unallocated;
+	for (int i = 0; i < textures.size(); i++) {
+		int width = textures[i].size[0];
+		int height = textures[i].size[1];
+		int blocksWidth = ceil(1.0 * width / blockSizeTexels);
+		int blocksHeight = ceil(1.0 * height / blockSizeTexels);
+		int offset[2] = { 0, 0 };
+		if (!allocator.Allocate(blocksWidth, blocksHeight, offset)) {
+			// need to allocate a new page, but ...
+			unallocated.push_back(i);
+			//break;
+			result.sampleParameters.push_back({});
+		}
+		else {
+			SampleParameters p;
+			p.index = 0;
+			p.nothing = 0;
+			p.offsetX = (float)blockSizeTexels * offset[0] / baseTextureSize;
+			p.offsetY = (float)blockSizeTexels * offset[1] / baseTextureSize;
+			p.u[0] = (float)width / baseTextureSize; p.u[1] = 0;
+			p.v[1] = (float)height / baseTextureSize; p.v[0] = 0;
+			int dstPitch = 4 * baseTextureSize;
+			sampleParameters.push_back(p);
+			CopyIntoImage(pData, dstPitch, offset[0] * blockSizeTexels * 4, offset[1] * blockSizeTexels, textures[i].pData, textures[i].size[0] * 4, textures[i].size[1]);
+		}
+	}
+	Texture t;
+	t.channels = 4;
+	t.format = 0;
+	t.id = 0;
+	t.pData = pData;
+	t.size[0] = baseTextureSize;
+	t.size[1] = baseTextureSize;
+	vector<Texture> tv;
+	tv.push_back(t);
+	TextureAtlas array = CreateTextureArray(tv, pDevice, pCommandList, pHeap, heapOffset);
+	result.pDescriptor = array.pDescriptor;
+	result.pResource = array.pResource;
+	result.sampleParameters = sampleParameters;
+	return result;
+
 }
 
 ID3D12Resource* CreateStaticBuffer(BYTE* pData, int sizeInBytes, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset) {
 	
 	ID3D12Resource* result;
-	
+	int resourceSize = (sizeInBytes / 256 + 1) * 256;
 	pDevice->CreateCommittedResource(
 		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
 		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(max(sizeInBytes, 256)),
+		&CD3DX12_RESOURCE_DESC::Buffer(resourceSize),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
 		IID_PPV_ARGS(&result));
@@ -443,7 +562,7 @@ ID3D12Resource* CreateStaticBuffer(BYTE* pData, int sizeInBytes, ID3D12Device* p
 	// Describe and create a constant buffer view.
 	D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
 	cbvDesc.BufferLocation = result->GetGPUVirtualAddress();
-	cbvDesc.SizeInBytes = max(sizeInBytes, 256);
+	cbvDesc.SizeInBytes = resourceSize;
 	int incrSize = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	CD3DX12_CPU_DESCRIPTOR_HANDLE handle(pHeap->GetCPUDescriptorHandleForHeapStart(), incrSize * heapOffset);
 	pDevice->CreateConstantBufferView(&cbvDesc, handle);
@@ -483,6 +602,7 @@ void LoadTest(SpriteTest& test) {
 		fprintf(stderr, "Error loading config file: %s", testFileName);
 		return;
 	}
+	int textureOffset = test.textures.size();
 	int numTextures = 0;
 	fscanf_s(file, "Textures %d\n", &numTextures);
 	stbi_set_flip_vertically_on_load(true);
@@ -503,6 +623,7 @@ void LoadTest(SpriteTest& test) {
 	for (int i = 0; i < numSprites; i++) {
 		Sprite s;
 		fscanf_s(file, "%f %f %f %f %f %d\n", &s.position[0], &s.position[1], &s.size[0], &s.size[1], &s.rotation, &s.textureID);
+		s.textureID = textureOffset + s.textureID;
 		test.sprites.push_back(s);
 		if (s.textureID != currentTextureID) {
 			test.offsets.push_back(i);
@@ -512,6 +633,29 @@ void LoadTest(SpriteTest& test) {
 	fclose(file);
 }
 
+bool LoadFont(vector<Texture>& textures) {
+	char filename[] = "font/A.png";
+	for (char c = 'A'; c <= 'Z'; c++) {
+		FILE* file = nullptr;
+		filename[5] = c;
+		fopen_s(&file, filename, "r");
+		if (file == nullptr) {
+			fprintf(stderr, "Error loading config file: %s", testFileName);
+			return false;
+		}
+		stbi_set_flip_vertically_on_load(true);
+		Texture t;
+		sscanf_s(filename, "%s\n", &t.fileName, 256);
+		int requestChannels = 4;
+		stbi_uc* texData = stbi_load(t.fileName, &t.size[0], &t.size[1], &t.channels, requestChannels);
+		t.format = 0;
+		t.pData = texData;
+		t.channels = 4;
+		textures.push_back(t);
+		fclose(file);
+	}
+	return true;
+}
 void PrintTestParams(SpriteTest& test) {
 	for (const Sprite& s : test.sprites) {
 		printf("Sprite: pos(%f, %f), size(%f, %f), rotation(%f), textureID(%d)\n", s.position[0], s.position[1], s.size[0], s.size[1], s.rotation, s.textureID);

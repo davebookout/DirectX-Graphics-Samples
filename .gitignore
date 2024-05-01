@@ -21,3 +21,6 @@
 *.opendb
 Samples/Desktop/D3D12HelloWorld/src/HelloVAResourceInterop/*.h264
 Samples/Desktop/D3D12HelloWorld/src/HelloVAEncode/*.h264
+*.aps
+Samples/Desktop/D3D12HelloWorld/src/HelloTexture/D3D12HelloTexture.rc
+Samples/Desktop/D3D12HelloWorld/src/HelloTexture/resource.h

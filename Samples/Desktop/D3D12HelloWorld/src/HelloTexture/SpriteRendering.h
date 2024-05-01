@@ -5,8 +5,8 @@
 
 
 struct SampleParameters {
-	int offsetX = 0;
-	int offsetY = 0;
+	float offsetX = 0;
+	float offsetY = 0;
 	int index = 0;
 	int nothing = 0;
 	float u[2] = { 1.0, 0.0 };
@@ -15,16 +15,17 @@ struct SampleParameters {
 
 struct TextureAtlas {
 	ID3D12Resource* pResource;
-	int width;
-	int height;
-	int slices;
+	D3D12_CPU_DESCRIPTOR_HANDLE pDescriptor;
+	int width = 0;
+	int height = 0;
+	int slices = 0;
 	std::vector<SampleParameters> sampleParameters;
 };
 
 struct Texture {
 	int size[2];
 	int channels;
-	int format;
+	int format; // assuming 4 channel uncompressed
 	unsigned int id;
 	char fileName[256];
 	unsigned char* pData;
@@ -53,6 +54,7 @@ public:
 
 	SpriteTest mData;
 	ID3D12Resource* mSpriteBuffer;
+	UINT8* mpVertexDataBegin;
 	D3D12_VERTEX_BUFFER_VIEW mSpriteBufferView;
 	std::vector<ID3D12Resource*> mSpriteTextures;
 	ID3D12DescriptorHeap* mSRVHeap;
