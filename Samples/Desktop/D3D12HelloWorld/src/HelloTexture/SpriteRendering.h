@@ -1,35 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-
-
-
-struct SampleParameters {
-	float offsetX = 0;
-	float offsetY = 0;
-	int index = 0;
-	int nothing = 0;
-	float u[2] = { 1.0, 0.0 };
-	float v[2] = { 0.0, 1.0 };
-};
-
-struct TextureAtlas {
-	ID3D12Resource* pResource;
-	D3D12_CPU_DESCRIPTOR_HANDLE pDescriptor;
-	int width = 0;
-	int height = 0;
-	int slices = 0;
-	std::vector<SampleParameters> sampleParameters;
-};
-
-struct Texture {
-	int size[2];
-	int channels;
-	int format; // assuming 4 channel uncompressed
-	unsigned int id;
-	char fileName[256];
-	unsigned char* pData;
-};
+#include "Texture.h"
 
 struct Sprite {
 	float position[2];
@@ -44,6 +16,10 @@ struct SpriteTest {
 	std::vector<int> offsets;
 };
 
+void LoadTest(SpriteTest& test);
+bool LoadFont(std::vector<Texture>& textures);
+
+void PrintTestParams(SpriteTest& test);
 
 class SpriteRenderer {
 
@@ -51,7 +27,7 @@ public:
 	void LoadAssets(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, std::wstring assetPath);
 	void CreatePipelineState(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, std::wstring assetPath);
 	void PopulateCommandList(ID3D12GraphicsCommandList* pCommandList);
-
+	void LoadAssetsComplete(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue);
 	SpriteTest mData;
 	ID3D12Resource* mSpriteBuffer;
 	UINT8* mpVertexDataBegin;
@@ -66,6 +42,5 @@ public:
 	ID3D12CommandAllocator* mCommandAllocator;
 	ID3D12GraphicsCommandList* mCommandList;
 
+	std::vector<ID3D12Resource*> mFreeList;
 };
-void LoadTest(SpriteTest& test);
-void PrintTestParams(SpriteTest& test);
