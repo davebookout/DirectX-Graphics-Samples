@@ -12,6 +12,7 @@
 #include "stdafx.h"
 #include "D3D12HelloTexture.h"
 #include "SpriteRendering.h"
+#include "dxgidebug.h"
 
 D3D12HelloTexture::D3D12HelloTexture(UINT width, UINT height, std::wstring name) :
     DXSample(width, height, name), 
@@ -420,8 +421,9 @@ void D3D12HelloTexture::OnDestroy()
     // Ensure that the GPU is no longer referencing resources that are about to be
     // cleaned up by the destructor.
     WaitForPreviousFrame();
-
     CloseHandle(m_fenceEvent);
+    spriteRenderer.OnDestroy();
+
 }
 
 void D3D12HelloTexture::PopulateCommandList()
@@ -461,9 +463,6 @@ void D3D12HelloTexture::PopulateCommandList()
 
     spriteRenderer.PopulateCommandList(m_commandList.Get());
 
-    //m_commandList->IASetVertexBuffers(0, 1, &m_spriteBufferView);
-    //m_commandList->DrawInstanced(3, m_test->sprites.size(), 0, 0);
-    // Indicate that the back buffer will now be used to present.
     m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
     ThrowIfFailed(m_commandList->Close());

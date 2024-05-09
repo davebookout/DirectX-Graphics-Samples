@@ -73,13 +73,11 @@ void SpriteRenderer::LoadAssets(ID3D12Device* pDevice, ID3D12GraphicsCommandList
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&mSpriteBuffer));
-
+		mSpriteBuffer->SetName(L"sprite instance buffer");
 		// Copy the triangle data to the vertex buffer.
-		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
+		CD3DX12_RANGE readRange(0, 0);        
 		mSpriteBuffer->Map(0, &readRange, reinterpret_cast<void**>(&mpVertexDataBegin));
 		memcpy(mpVertexDataBegin, mData.sprites.data(), sizeof(Sprite) * mData.sprites.size());
-		// keep mapped to update later.
-		//mSpriteBuffer->Unmap(0, nullptr);
 
 		// Initialize the vertex buffer view.
 		mSpriteBufferView.BufferLocation = mSpriteBuffer->GetGPUVirtualAddress();
@@ -99,7 +97,6 @@ void SpriteRenderer::LoadAssets(ID3D12Device* pDevice, ID3D12GraphicsCommandList
 			
 	}
 	TextureAtlas array = CreateTextureArray(mData.textures, pDevice, pCommandList, mSRVHeap, arrayOffset, mFreeList);
-	//ID3D12Resource* textureInfoBuffer = CreateStaticBuffer((BYTE*)(array.sampleParameters.data()), sizeof(SampleParameters) * mData.textures.size(), pDevice, pCommandList, mSRVHeap, cbufferOffset);
 
 	int baseTextureSize = 1024;
 	TextureAtlas atlas = CreateTextureAtlas(mData.textures, pDevice, pCommandList, mSRVHeap, atlasOffset, baseTextureSize, mFreeList);
@@ -107,9 +104,10 @@ void SpriteRenderer::LoadAssets(ID3D12Device* pDevice, ID3D12GraphicsCommandList
 	pCommandList->Close();
 	ID3D12CommandList* ppCommandLists[] = { pCommandList };
 	pCommandQueue->ExecuteCommandLists(1, ppCommandLists);
+
 }
 
-void SpriteRenderer::LoadAssetsComplete(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue) {
+void SpriteRenderer::LoadAssetsComplete() {
 	for (ID3D12Resource* pR : mFreeList) {
 		pR->Release();
 	}
@@ -210,6 +208,7 @@ void SpriteRenderer::CreatePipelineState(ID3D12Device* pDevice, ID3D12GraphicsCo
 		srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		pDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&mSRVHeap));
+		mSRVHeap->SetName(L"Sprite Renderer SRV heap");
 		mHeapIncr = pDevice->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 	}
 
@@ -267,6 +266,19 @@ void SpriteRenderer::PopulateCommandList(ID3D12GraphicsCommandList* pCommandList
 	}
 }
 
+void SpriteRenderer::OnDestroy() {
+	LoadAssetsComplete();
+	mCommandAllocator->Release();
+	mSpriteBuffer->Release();
+	for (ID3D12Resource* p : mSpriteTextures) {
+		p->Release();
+	}
+	mSRVHeap->Release();
+	mRootSignature->Release();
+	mPipelineState->Release();
+//mCommandList->Release();
+	
+}
 bool LoadFont(vector<Texture>& textures) {
 	char filename[] = "font/A.png";
 	for (char c = 'A'; c <= 'Z'; c++) {
@@ -345,7 +357,6 @@ void LoadTest(SpriteTest& test) {
 			currentTextureID = s.textureID;
 		}
 	}
-	//test.sprites.resize(100);
 	int testTexID = 0;
 	float size = 2.0 / test.textures.size();
 	float x = -1.0 + size / 2;

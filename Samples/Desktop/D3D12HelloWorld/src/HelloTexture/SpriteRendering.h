@@ -27,7 +27,9 @@ public:
 	void LoadAssets(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, std::wstring assetPath);
 	void CreatePipelineState(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue, std::wstring assetPath);
 	void PopulateCommandList(ID3D12GraphicsCommandList* pCommandList);
-	void LoadAssetsComplete(ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12CommandQueue* pCommandQueue);
+	void LoadAssetsComplete();
+	void OnDestroy();
+
 	SpriteTest mData;
 	ID3D12Resource* mSpriteBuffer;
 	UINT8* mpVertexDataBegin;
@@ -40,7 +42,6 @@ public:
 	ID3D12RootSignature* mRootSignature;
 	ID3D12PipelineState* mPipelineState;
 	ID3D12CommandAllocator* mCommandAllocator;
-	ID3D12GraphicsCommandList* mCommandList;
 
 	std::vector<ID3D12Resource*> mFreeList;
 };

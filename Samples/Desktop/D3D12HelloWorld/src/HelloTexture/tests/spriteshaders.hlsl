@@ -23,7 +23,6 @@ struct VSOutput
     float2 uv : TEXCOORD;
     float2 startUV : TEXCOORD1;
     float2 endUV : TEXCOORD2;
-    float2 offset : TEXCOORD3;
     int texID : TEXTURE_ID;
     float4 position : SV_POSITION;
 };
@@ -32,19 +31,14 @@ struct PSInput
     float2 uv : TEXCOORD0;
     float2 startUV : TEXCOORD1;
     float2 endUV : TEXCOORD2;
-    float2 offset : TEXCOORD3;
     int texID : TEXTURE_ID;
 };
 
 struct SampleParameters
 {
-    float2 offset;
-    int index;
-    int nothing;
-    //float2 u;
-    //float2 v;
     float2 start;
     float2 end;
+    int index;
 };
 
 cbuffer SceneConstantBuffer : register(b0)
@@ -76,7 +70,6 @@ VSOutput VSMain(VSInput vsIn)
     result.uv = 2 * vertexScale;
     result.startUV = sampleParameters[vsIn.texID].start;
     result.endUV = sampleParameters[vsIn.texID].end;
-    result.offset = sampleParameters[vsIn.texID].offset;
     result.texID = sampleParameters[vsIn.texID].index;
     return result;
 }
@@ -84,10 +77,9 @@ VSOutput VSMain(VSInput vsIn)
 float4 PSMain(PSInput input) : SV_TARGET
 {
     clip(any(input.uv.xy > 1) ? -1 : 1);
-    //float3 sampleUV = float3(input.offset + input.uv.x * input.U + input.uv.y * input.V, input.texID);
     float3 sampleUV = float3(lerp(input.startUV, input.endUV, input.uv), input.texID);
     float4 result = g_textureAtlas.Sample(g_sampler, sampleUV); 
-    //clip(result.a - .9);
+    clip(result.a - .9);
     return result;
 
 }

@@ -11,7 +11,7 @@
 
 #include "stdafx.h"
 #include "Win32Application.h"
-
+#include "dxgidebug.h"
 HWND Win32Application::m_hwnd = nullptr;
 
 int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
@@ -67,6 +67,12 @@ int Win32Application::Run(DXSample* pSample, HINSTANCE hInstance, int nCmdShow)
     }
 
     pSample->OnDestroy();
+    IDXGIDebug1* pDebug = nullptr;
+    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&pDebug))))
+    {
+        pDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_DETAIL);
+        pDebug->Release();
+    }
 
     // Return this part of the WM_QUIT message to Windows.
     return static_cast<char>(msg.wParam);

@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "Texture.h"
+#include "Allocator2D.h"
 #include <d3d12.h>
 #include <d3dx12.h>
 #include <array>
@@ -11,6 +12,8 @@ TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice
 	// array slices are same size -- find max size for slices
 	// will need scale for uvs if not same size.
 	TextureAtlas result;
+	static int textureArrayCount = 0;
+	textureArrayCount++;
 	ID3D12Resource* pTexture = nullptr;
 	int maxWidth = INT_MIN;
 	int maxHeight = INT_MIN;
@@ -43,9 +46,10 @@ TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			nullptr,
 			IID_PPV_ARGS(&pTexture));
-		//const UINT64 uploadBufferSize = textures.size() * GetRequiredIntermediateSize(pTexture, 0, 1);
 		const UINT64 uploadBufferSize = GetRequiredIntermediateSize(pTexture, 0, textures.size() * maxMips);
-
+		std::wstring textureatlasname = L"texture atlas" + std::to_wstring(textureArrayCount);
+		pTexture->SetName(textureatlasname.c_str());
+		
 		// Create the GPU upload buffer.
 		pDevice->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
@@ -54,7 +58,8 @@ TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(&pTextureUploadHeap));
-
+		std::wstring uploadheapname = L"Upload Heap" + std::to_wstring(textureArrayCount);
+		pTextureUploadHeap->SetName(uploadheapname.c_str());
 		if (pTexture != nullptr && pTextureUploadHeap != nullptr) {
 			tempResources.push_back(pTextureUploadHeap);
 			int rowPitch = maxWidth * 4;// t.channels;
@@ -63,12 +68,9 @@ TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice
 			for (int i = 0; i < textures.size(); i++) {
 				SampleParameters params;
 				params.index = i;
-				params.offsetX = 0; params.offsetY = 0;
 				params.start[0] = 0.0f; params.start[1] = 0.0f;
 				params.end[0] = (float)(textures[i].size[0] - 1) / maxWidth; params.end[1] = (float)(textures[i].size[1] - 1)/ maxHeight;//
-				//params.u[0] = 1.0 * textures[i].size[0] / maxWidth; params.u[1] = 0.0;
-				//params.v[0] = 0.0; params.v[1] = 1.0 * textures[i].size[1] / maxHeight;
-
+				
 				result.sampleParameters.push_back(params);
 				for (int mip = 0; mip < textures[i].mipData.size(); mip++) {
 					int subresource = i * maxMips + mip;
@@ -92,10 +94,6 @@ TextureAtlas CreateTextureArray(vector<Texture>& textures, ID3D12Device* pDevice
 			srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 			srvDesc.Format = textureDesc.Format;
 			srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2DARRAY;
-			//srvDesc.Texture2D.MipLevels = maxMips;
-			//srvDesc.Texture2D.MostDetailedMip = 0;
-			//srvDesc.Texture2D.PlaneSlice = 0;
-			//srvDesc.
 			srvDesc.Texture2DArray.ArraySize = textures.size();
 			srvDesc.Texture2DArray.FirstArraySlice = 0;
 			srvDesc.Texture2DArray.MipLevels = maxMips;
@@ -124,73 +122,16 @@ void CopyIntoImage(BYTE* dst, int dstPitch, int dstOffsetX, int dstOffsetY, BYTE
 	}
 }
 
-class Allocator2D {
-	int mBlockSize;
-	std::array<unsigned int, 32> mMemory;
-	//keep it simple with 32x32 block allocation	
-public:
-	Allocator2D() : mBlockSize(32), mMemory(array<unsigned int, 32>()) {
-		for (unsigned int& m : mMemory) {
-			m = 0xFFFFFFFF;
-		}
-	};
-	bool Available(int x, int y, int offset[2]) {
-		if (x + offset[0] >= mBlockSize || y + offset[1] >= mBlockSize)
-			return false;
-		unsigned int mask = (1 << x) - 1;
-		mask = mask << offset[0];
-		for (int j = offset[1]; j < offset[1] + y; j++) {
-			if ((mMemory[j] & mask) != mask) {
-				return false;
-			}
-		}
-		return true;
-	}
-
-	void MarkUsed(int x, int y, int offset[2]) {
-		unsigned int m = ~(((1 << x) - 1) << offset[0]);
-		for (int j = offset[1]; j < offset[1] + y; j++) {
-			mMemory[j] = (mMemory[j] & m);
-		}
-	}
-
-	bool Allocate(int blocksX, int blocksY, int outOffset[2]) {
-		//just grab first top left available...
-		unsigned int allocate = (1 << blocksX) - 1;
-		outOffset[0] = 0; outOffset[1] = 0;
-		while (outOffset[1] < mBlockSize) {
-			if (Available(blocksX, blocksY, outOffset))
-			{
-				MarkUsed(blocksX, blocksY, outOffset);
-				return true;
-			}
-			outOffset[1]++;
-			if (outOffset[1] == mBlockSize) {
-				if (outOffset[0] < mBlockSize - 1) {
-					outOffset[0]++;
-					outOffset[1] = 0;
-				}
-			}
-		}
-		return false;
-
-	}
-
-
-};
-
 TextureAtlas CreateTextureAtlas(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset, int baseTextureSize, vector<ID3D12Resource*>& tempResources) {
 
-	Allocator2D allocator;
-	//allocator has 32x32 blocks to allocate
-	//block size in texels will be
+	Allocator2D allocator(baseTextureSize / 32);
 	TextureAtlas result;
 	result.height = baseTextureSize;
 	result.width = baseTextureSize;
 	result.slices = 1;
 	int blockSizeTexels = baseTextureSize / 32;
 	vector<SampleParameters> sampleParameters;
-	vector<int> unallocated;
+	
 	for (Texture& t : textures) {
 		int nextMipWidth = t.size[0] >> 1;
 		int nextMipHeight = t.size[1] >> 1;
@@ -230,31 +171,24 @@ TextureAtlas CreateTextureAtlas(vector<Texture>& textures, ID3D12Device* pDevice
 		int height = textures[i].size[1];
 		int blocksWidth = ceil(1.0 * width / blockSizeTexels);
 		int blocksHeight = ceil(1.0 * height / blockSizeTexels);
-		int offset[2] = { 0, 0 };
-		if (!allocator.Allocate(blocksWidth, blocksHeight, offset)) {
-			// need to allocate a new page, but ...
-			unallocated.push_back(i);
-			//break;
+		//int offset[2] = { 0, 0 };
+		AllocationID allocId = allocator.Allocate(blocksWidth, blocksHeight);
+		if (!allocId.Valid()) {			
 			result.sampleParameters.push_back({});
 		}
 		else {
-			SampleParameters p;
+			SampleParameters p;			
 			p.index = 0;
-			p.nothing = 0;
-			p.offsetX = (float)blockSizeTexels * offset[0] / baseTextureSize;
-			p.offsetY = (float)blockSizeTexels * offset[1] / baseTextureSize;
-			p.start[0] = (float)blockSizeTexels * offset[0] / baseTextureSize;
-			p.start[1] = (float)blockSizeTexels * offset[1] / baseTextureSize;
-			p.end[0] = (float)(blockSizeTexels * offset[0] + width - 1) / baseTextureSize;
-			p.end[1] = (float)(blockSizeTexels * offset[1] + height - 1) / baseTextureSize;
+			p.start[0] = (float)blockSizeTexels * allocId.offsetX / baseTextureSize;
+			p.start[1] = (float)blockSizeTexels * allocId.offsetY / baseTextureSize;
+			p.end[0] = (float)(blockSizeTexels * allocId.offsetX + width - 1) / baseTextureSize;
+			p.end[1] = (float)(blockSizeTexels * allocId.offsetY + height - 1) / baseTextureSize;
 
-			//p.u[0] = (float)width / baseTextureSize; p.u[1] = 0;
-			//p.v[1] = (float)height / baseTextureSize; p.v[0] = 0;
 			int dstPitch = 4 * baseTextureSize;
 			sampleParameters.push_back(p);
 			for (int mip = 0; mip < textures[i].mipData.size(); mip++) {				
-				int offsetX = (offset[0] * blockSizeTexels * textures[0].channels) >> mip;
-				int offsetY = (blockSizeTexels * offset[1]) >> mip;
+				int offsetX = (allocId.offsetX * blockSizeTexels * textures[0].channels) >> mip;
+				int offsetY = (blockSizeTexels * allocId.offsetY) >> mip;
 				CopyIntoImage(atlasTexture[0].mipData[mip].pData, 
 					atlasTexture[0].mipData[mip].rowPitch, 
 					offsetX, offsetY, 
@@ -294,14 +228,11 @@ ID3D12Resource* CreateStaticBuffer(BYTE* pData, int sizeInBytes, ID3D12Device* p
 	CD3DX12_CPU_DESCRIPTOR_HANDLE handle(pHeap->GetCPUDescriptorHandleForHeapStart(), incrSize * heapOffset);
 	pDevice->CreateConstantBufferView(&cbvDesc, handle);
 
-	// Map and initialize the constant buffer. We don't unmap this until the
-	// app closes. Keeping things mapped for the lifetime of the resource is okay.
-	CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
+	CD3DX12_RANGE readRange(0, 0);
 	BYTE* pMappedData = nullptr;
 	result->Map(0, &readRange, reinterpret_cast<void**>(&pMappedData));
 	CD3DX12_RANGE writtenRange(0, sizeInBytes);
 	memcpy(pMappedData, pData, sizeInBytes);
-	//result->Unmap(0, &writtenRange);
 	return result;
 }
 
@@ -318,34 +249,29 @@ void DownScale(TextureData& src, TextureData& dst, bool zeroOneAlpha) {
 			for (int x = 0; x < blockSizeX; x++) {
 				for (int y = 0; y < blockSizeY; y++) {
 					int p = (x + xOffset) * 4 + (y + yOffset) * src.rowPitch;
-					UINT alpha = 0xFF;// src.pData[p] & 0x000000FF;
-					block[0] += (src.pData[p]); //&0xFF000000 >> 24); *alpha;
-					block[1] += (src.pData[p + 1]);// &0x00FF0000 >> 16); *alpha;
-					block[2] += (src.pData[p + 2]); //&0x0000FF00 >> 8); *alpha;
-					block[3] += (src.pData[p + 2]);
+					UINT alpha = (src.pData[p + 3]); ;
+					block[0] += alpha * (src.pData[p]); 
+					block[1] += alpha * (src.pData[p + 1]);
+					block[2] += alpha * (src.pData[p + 2]);
+					block[3] += alpha;// (src.pData[p + 2]);
 
 				}
 			}
-			UINT alpha = block[3];			
-			block[0] /= (blockSizeX*blockSizeY);//= alpha > 0 ? block[0] / alpha : 0;
-			block[1] /= (blockSizeX*blockSizeY);//= alpha > 0 ? block[1] / alpha : 0;
-			block[2] /= (blockSizeX*blockSizeY);//= alpha > 0 ? block[2] / alpha : 0;
-			block[3] /= (blockSizeX*blockSizeY);//= 0xff;// zeroOneAlpha ? (alpha > 0) * 0xFF : alpha / 4;
-			UINT newValue = ((block[0] & 0xFF) << 24) | ((block[1] & 0xFF) << 16) | ((block[2] & 0xFF) << 8) | (block[3] & 0xFF);
+			UINT alpha = block[3];	
+			if (alpha > 0) {
+				block[0] /= alpha;//(blockSizeX*blockSizeY);			
+				block[1] /= alpha;//(blockSizeX*blockSizeY);
+				block[2] /= alpha;//(blockSizeX*blockSizeY);
+				block[3] /= (blockSizeX * blockSizeY);
+			}
 			int p = dst.rowPitch * bY + bX * 4;
-			//dst.pData[dst.rowPitch * bY + bX * 4] = newValue;
-			dst.pData[p] = block[0];
-			dst.pData[p + 1] = block[1];
-			dst.pData[p + 2] = block[2];
-			dst.pData[p + 3] = block[3];
+			dst.pData[p]		= block[0];
+			dst.pData[p + 1]	= block[1];
+			dst.pData[p + 2]	= block[2];
+			dst.pData[p + 3]	= block[3];
 		}
 	}
-	// fix up edges.
-	//int edgeX = src.size[0] % dst.size[0];
-	//int edgeY = src.size[1] % dst.size[1];
-	//if (edgeX > 0 || edgeY > 0) {
-
-	//}
+	// todo check edges
 }
 /*
 // notes:

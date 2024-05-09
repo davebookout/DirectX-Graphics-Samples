@@ -1,4 +1,4 @@
-Textures 9
+Textures 1
 images/green_64.png
 images/green_32.png
 images/red_256.png

@@ -18,12 +18,10 @@ struct Texture {
 };
 
 struct SampleParameters {
-	float offsetX = 0;
-	float offsetY = 0;
-	int index = 0;
-	int nothing = 0;
 	float start[2] = { 1.0, 0.0 };
 	float end[2] = { 0.0, 1.0 };
+	int index = 0;
+	int padding[3];
 };
 
 struct TextureAtlas {
@@ -34,11 +32,6 @@ struct TextureAtlas {
 	int slices = 0;
 	std::vector<SampleParameters> sampleParameters;
 };
-
-// CreateSingleTextures
-// returns a vector of resources created from the input textures
-// dead! only arrays!
-//vector<ID3D12Resource*> CreateSingleTextures(vector<Texture>& textures, ID3D12Device* pDevice, ID3D12GraphicsCommandList* pCommandList, ID3D12DescriptorHeap* pHeap, int heapOffset);
 
 // CreateTextureArray
 // returns a TextureArray resource from the input textures.
