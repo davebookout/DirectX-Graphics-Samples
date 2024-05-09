@@ -123,8 +123,10 @@
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Allocator2D.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="SpriteRendering.h" />
+    <ClInclude Include="Texture.h" />
     <ClInclude Include="Win32Application.h" />
     <ClInclude Include="D3D12HelloTexture.h" />
     <ClInclude Include="DXSample.h" />
@@ -132,7 +134,9 @@
     <ClInclude Include="stdafx.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Allocator2D.cpp" />
     <ClCompile Include="SpriteRendering.cpp" />
+    <ClCompile Include="Texture.cpp" />
     <ClCompile Include="Win32Application.cpp" />
     <ClCompile Include="D3D12HelloTexture.cpp" />
     <ClCompile Include="DXSample.cpp" />
